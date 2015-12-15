@@ -5,9 +5,10 @@ import scala.collection.mutable.MutableList
 	
 object OpenSoC {
     def main(args: Array[String]): Unit = {
-		val mySWargs = Array("--backend", "c", "--genHarness", "--compile", "--parallelMakeJobs", "-1", "--compileInitializationUnoptimized", "--lineLimitFunctions", "1024", "--minimumLinesPerFile", "32768", "--test", "--Wall", "--vcd", "--reportDims")//, "--debug", "--ioDebug")
+		val mySWargs = Array("--backend", "c", "--genHarness", "--compile", "--parallelMakeJobs", "1", "--compileInitializationUnoptimized", "--lineLimitFunctions", "128", "--minimumLinesPerFile", "1024", "--test", "--Wall", "--vcd", "--reportDims")//, "--debug", "--ioDebug")
 		val myHWargs = Array("--backend", "v", "--genHarness", "--vcd")
-		val mySysCargs = Array("--backend", "sysc", "--genHarness", "--compile", "--parallelMakeJobs", "-1", "--compileInitializationUnoptimized", "--lineLimitFunctions", "1024", "--minimumLinesPerFile", "32768", "--test", "--Wall", "--vcd", "--reportDims")//, "--debug", "--ioDebug")
+        val myDotargs = Array("--backend", "dot")
+        val mySysCargs = Array("--backend", "sysc", "--genHarness", "--compile", "--parallelMakeJobs", "-1", "--compileInitializationUnoptimized", "--lineLimitFunctions", "1024", "--minimumLinesPerFile", "32768", "--test", "--Wall", "--vcd", "--reportDims")//, "--debug", "--ioDebug")
 		var parms = Parameters.empty
 
 		var Dim = 2 // Dimension of topology
@@ -41,6 +42,7 @@ object OpenSoC {
                 case "--injRate"        => (injRate = arg(1).toDouble)
                 case "--sw"             => (myargs = mySWargs)
                 case "--hw"             => (myargs = myHWargs) 
+                case "--dot"            => (myargs = myDotargs)
                 case "--sysc"           => (myargs = mySysCargs)
 				case "--Dim"			=> (Dim = arg(1).toInt)
 				case "--C"				=> (C = arg(1).toInt)
@@ -89,8 +91,9 @@ object OpenSoC {
 												))
 			case "RRArbiter"	=>	(moduleToTest = () =>  Module(new RRArbiter(
 													parms.child("MyRRArbiter", Map(
-														("numReqs"->Soft(8))
-														)
+														("numReqs"->Soft(8)),
+                                                        ("numPriorityLevels"->Hard(5))
+                                                      )
 													))
 												))
 			case "RRArbiterPriority" =>	(moduleToTest = () =>  Module(new RRArbiterPriority(
@@ -284,6 +287,7 @@ object OpenSoC {
 														("routerInCredits"->Soft(8)),
 														("routerOutCredits"->Soft(8)),
 														("numVCs"->Soft(numVCs)),
+														("credThreshold"->Hard(1)),
 
 														("routerID"->Hard(Vector(0,0))),
 														("rfCtor"->Soft((parms: Parameters) => new CMeshDOR(parms))),
@@ -296,11 +300,121 @@ object OpenSoC {
 														("routerCtor"->Soft((parms: Parameters) => new SimpleRouter(parms))),
 
 														("flitIDWidth"->Hard(4)),
-														("payloadWidth"->Hard(16))
+														("payloadWidth"->Hard(16)),
+                                                        ("numPriorityLevels"->Hard(5))
+
 														)
 													))
 												))
-			case "OpenSoC_CMesh"	=> (moduleToTest = () => Module(new OpenSoC_CMesh[Packet](
+			case "SimpleVCRouterTestWrapper"	=> (moduleToTest = () => Module(new SimpleVCRouterTestWrapper(
+													parms.child("MySimpleRouter", Map(
+														("TopologyDimension"->Hard(Dim)),
+														("RoutersPerDim"->Hard(K)),
+														("Concentration"->Hard(C)),
+
+														("numInChannels"->Soft(numPorts)),
+														("numOutChannels"->Soft(numPorts)),
+														("queueDepth"->Soft(9)),
+														("routerInCredits"->Soft(8)),
+														("routerOutCredits"->Soft(8)),
+														("numVCs"->Soft(numVCs)),
+														("credThreshold"->Hard(1)),
+
+														("routerID"->Hard(Vector(0,0))),
+														("rfCtor"->Soft((parms: Parameters) => new CMeshDOR(parms))),
+
+														("packetIDWidth"->Hard(8)),
+
+														("packetTypeWidth"->Hard(4)),
+														("destCordWidth"->Hard(Math.max(log2Up(K.max),log2Up(C)))),
+														("destCordDim"->Hard(Dim + 1)),
+														("routerCtor"->Soft((parms: Parameters) => new SimpleVCRouter(parms))),
+
+														("flitIDWidth"->Hard(4)),
+														("payloadWidth"->Hard(16)),
+                                                        ("numPriorityLevels"->Hard(5))
+
+														)
+													))
+												))
+            case "My_Mesh"	=> (moduleToTest = () => Module(new My_Mesh[Flit](
+													parms.child("My_Mesh", Map(
+														("TopologyDimension"->Hard(Dim)),
+														("RoutersPerDim"->Hard(K)),
+														("Concentration"->Hard(C)),
+														("numVCs"->Hard(numVCs)),
+														("credThreshold"->Hard(1)),
+
+														("queueDepth"->Soft(16)),
+
+														("packetIDWidth"->Hard(16)),
+														("packetMaxLength"->Hard(16)),
+														("packetWidth"->Hard(32)),
+
+														("packetTypeWidth"->Hard(4)),
+														("destCordWidth"->Hard(Math.max(log2Up(K.max),log2Up(C)))),
+														("destCordDim"->Hard(Dim + C)),
+
+														("flitIDWidth"->Hard(4)),
+														("payloadWidth"->Hard(32)),
+														("InputFlitizer"->Soft((parms: Parameters) => new FlitToFlit(parms))),
+														("numPriorityLevels"->Hard(5))
+                                                      )
+													), (p)=>new Flit(p))
+												))
+            case "My_MeshWrapper"	=> (moduleToTest = () => Module(new My_MeshWrapper(
+													parms.child("My_Mesh", Map(
+														("TopologyDimension"->Hard(Dim)),
+														("RoutersPerDim"->Hard(K)),
+														("Concentration"->Hard(C)),
+														("numVCs"->Hard(numVCs)),
+														("credThreshold"->Hard(1)),
+
+														("queueDepth"->Soft(16)),
+
+														("packetIDWidth"->Hard(16)),
+														("packetMaxLength"->Hard(16)),
+														("packetWidth"->Hard(32)),
+
+														("packetTypeWidth"->Hard(4)),
+														("destCordWidth"->Hard(Math.max(log2Up(K.max),log2Up(C)))),
+														("destCordDim"->Hard(Dim + C)),
+
+														("flitIDWidth"->Hard(4)),
+														("payloadWidth"->Hard(32)),
+														("InputFlitizer"->Soft((parms: Parameters) => new FlitToFlit(parms))),
+														("numPriorityLevels"->Hard(5))
+                                                      )
+													))
+												))
+
+            case "PortDataGen"	=> (moduleToTest = () => Module(new PortDataGen(
+													parms.child("MyPortDataGen", Map(
+														("TopologyDimension"->Hard(Dim)),
+														("RoutersPerDim"->Hard(K)),
+														("Concentration"->Hard(C)),
+														("numVCs"->Hard(numVCs)),
+														("credThreshold"->Hard(1)),
+
+														("queueDepth"->Soft(16)),
+
+														("packetIDWidth"->Hard(16)),
+														("packetMaxLength"->Hard(16)),
+														("packetWidth"->Hard(32)),
+
+														("packetTypeWidth"->Hard(4)),
+														("destCordWidth"->Hard(Math.max(log2Up(K.max),log2Up(C)))),
+														("destCordDim"->Hard(Dim + C)),
+
+														("flitIDWidth"->Hard(4)),
+														("payloadWidth"->Hard(32)),
+														("InputFlitizer"->Soft((parms: Parameters) => new FlitToFlit(parms))),
+														("numPriorityLevels"->Hard(5))
+                                                      )
+													))
+												))
+
+            case "OpenSoC_CMesh"	=> (moduleToTest = () => Module(new OpenSoC_CMesh[Packet](
 													parms.child("MyOpenSoC_CMesh", Map(
 														("TopologyDimension"->Hard(Dim)),
 														("RoutersPerDim"->Hard(K)),
@@ -423,7 +537,11 @@ object OpenSoC {
 			case "CMDORTester"				=> ( chiselMainTest(myargs, moduleToTest) { c => new CMDORTester(c.asInstanceOf[CMeshDOR]) } )
 			case "CFlatBflyDORTester"		=> ( chiselMainTest(myargs, moduleToTest) { c => new CFlatBflyDORTester(c.asInstanceOf[CFlatBflyDOR]) } )
 			case "SimpleRouterTester"		=> ( chiselMainTest(myargs, moduleToTest) { c => new SimpleRouterTester(c.asInstanceOf[SimpleRouterTestWrapper]) } )
-			case "OpenSoC_CFlatBtflyTester_Random"	=> ( chiselMainTest(myargs, moduleToTest) { c => new OpenSoC_CFlatBtflyTester_Random(c.asInstanceOf[OpenSoC_CFlatBfly[Flit]], parms) } )
+            case "SimpleVCRouterTester"		=> ( chiselMainTest(myargs, moduleToTest) { c => new SimpleVCRouterTester(c.asInstanceOf[SimpleVCRouterTestWrapper]) } )
+            case "OpenSoC_CFlatBtflyTester_Random"	=> ( chiselMainTest(myargs, moduleToTest) { c => new OpenSoC_CFlatBtflyTester_Random(c.asInstanceOf[OpenSoC_CFlatBfly[Flit]], parms) } )
+            case "PortDataGenTester"    => ( chiselMainTest(myargs, moduleToTest) { c => new PortDataGenTester(c.asInstanceOf[PortDataGen], parms) } )
+            case "My_MeshWrapperTest"    => ( chiselMainTest(myargs, moduleToTest) { c => new My_MeshWrapperTest(c.asInstanceOf[My_MeshWrapper], parms) } )
+            case "My_MeshTest"    => ( chiselMainTest(myargs, moduleToTest) { c => new My_MeshTest(c.asInstanceOf[My_Mesh[Flit]], parms) } )
             case "OpenSoC_CMeshTester_Random_VarInjRate"    => ( chiselMainTest(myargs, moduleToTest) { c => new OpenSoC_CMesh_CombinedTester_VarInjRate(c.asInstanceOf[OpenSoC_CMesh[Flit]], parms, injRate, "Random", packetCount, fragmentationFactor) } )
             case "OpenSoC_CMesh_NeighborTester_VarInjRate"  => ( chiselMainTest(myargs, moduleToTest) { c => new OpenSoC_CMesh_CombinedTester_VarInjRate(c.asInstanceOf[OpenSoC_CMesh[Flit]], parms, injRate, "Neighbor", packetCount, fragmentationFactor) } )
             case "OpenSoC_CMesh_TornadoTester_VarInjRate"   => ( chiselMainTest(myargs, moduleToTest) { c => new OpenSoC_CMesh_CombinedTester_VarInjRate(c.asInstanceOf[OpenSoC_CMesh[Flit]], parms, injRate, "Tornado", packetCount, fragmentationFactor) } )

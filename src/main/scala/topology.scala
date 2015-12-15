@@ -90,7 +90,8 @@ abstract class VCTopology(parms: Parameters) extends Module(parms) {
 		//	val cyclesChannelBusy	= Vec.fill(numRouters*routerRadix){UInt(OUTPUT, width=counterMax.getWidth)}
 		val cyclesRouterBusy	= Vec.fill(128){ UInt(OUTPUT, width=counterMax.getWidth)}	//DDD: Hack! need to create a counter per router, not some magic number
 		val cyclesChannelBusy	= Vec.fill(128*5){UInt(OUTPUT, width=counterMax.getWidth)}
-	}
+        val bypass = Vec.fill(numRouters) { Bool(INPUT) }
+    }
 }
 
 	// This class instantiates the proper number of routers and channels
@@ -169,7 +170,7 @@ class CMesh(parms: Parameters) extends Topology(parms) {
 				("routerOutCredits"->Soft(topoOutCredits)),
 				("rfCtor"->Soft(routingFuncCtor))
 			))))
-		//var newBusProbe = Chisel.Module( new BusProbe(parms) ) 
+        //var newBusProbe = Chisel.Module( new BusProbe(parms) ) 
 		var newBusProbe = Chisel.Module( new BusProbe(parms.child("BusProbeParms", Map( ("routerRadix"->Soft(routerRadix)) )) ) ) 
         var newcreditBuf = Chisel.Module( new CreditBuffer(parms))
 		routermap += coord -> newRouter
@@ -318,7 +319,8 @@ class VCCMesh(parms: Parameters) extends VCTopology(parms) {
 				("routerOutCredits"->Soft(topoOutCredits)),
 				("rfCtor"->Soft(routingFuncCtor))
 			))))
-		//var newBusProbe = Chisel.Module( new BusProbe(parms) ) 
+        newRouter.io.bypass := io.bypass(n)
+        //var newBusProbe = Chisel.Module( new BusProbe(parms) ) 
 		var newBusProbe = Chisel.Module( new BusProbe(parms.child("BusProbeParms", Map( ("routerRadix"->Soft(routerRadix)) )) ) ) 
         var newcreditBuf = Chisel.Module( new CreditBuffer(parms))
 		routermap += coord -> newRouter

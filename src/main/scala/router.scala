@@ -58,6 +58,7 @@ abstract class VCRouter(parms: Parameters) extends Module(parms) {
 		val inChannels = Vec.fill(numInChannels) { new ChannelVC(parms) }
 		val outChannels = Vec.fill(numOutChannels) { new ChannelVC(parms).flip() }
 		val counters = Vec.fill(2) {new CounterIO }
+        val bypass = Bool(INPUT)
 	}
 }
 

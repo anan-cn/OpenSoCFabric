@@ -1,3 +1,45 @@
+Fall 2015 ECE 527 Research
+==========================
+
+The code present in this repository is a research project done for ECE 527
+System-on-chip design. It explores methods for using clock gating with Xilinx 7-series
+FPGAs using the NoC.
+
+## Files in this repository ##
+
+Most files in this repository are part of OpenSoC Fabric.
+The following scala files were modified by us:
+    src/main/scala/main.scala
+    src/main/scala/router.scala
+    src/main/scala/routerTester.scala
+    src/main/scala/topology.scala
+
+The file below contains our original code
+    src/main/scala/mymesh.scala
+    manual_edit/VCRouterBypass.v
+    manual_edit/My_MeshWrapper-harness.v
+
+The remaining file in `manual_edit` is a slightly modified form of the generated NoC.
+
+## Reproducing our results ##
+
+1. Extract the Vivado project `vivado_files/noc.xpr.zip`
+2. Edit the testbench `My_MeshWrapper-harness.v` to enable or disable `io_bypass_1`
+3. Run behavioral simulation.
+
+  a. Use the following commands to get an saif:
+
+```
+restart
+open_saif "A.saif"
+log_saif [get_objects -r *]
+run 30 us
+close_saif
+```
+
+  b. Run synthesis and input the saif file to power analysis.
+
+
 OpenSoC Fabric
 ========
 

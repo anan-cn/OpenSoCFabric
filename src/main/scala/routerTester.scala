@@ -7,13 +7,13 @@ import scala.util.Random
 import Array._
 
 class SimpleVCRouterTestWrapper(parms: Parameters) extends Module(parms){
-
+    val concentration   = parms.get[Int]("Concentration")
 	val numInChannels 	= parms.get[Int]("numInChannels")
 	val numOutChannels 	= parms.get[Int]("numOutChannels")
 	val topoInCredits 	= parms.get[Int]("routerInCredits")
 	val topoOutCredits 	= parms.get[Int]("routerOutCredits")
 	
-	val routerCtor 		= parms.get[Parameters=>Router]("routerCtor")
+	val routerCtor 		= parms.get[Parameters=>VCRouter]("routerCtor")
 	val routingFuncCtor 	= parms.get[Parameters=>RoutingFunction]("rfCtor")
 
 	val io = new Bundle {
@@ -53,7 +53,7 @@ class SimpleVCRouterTestWrapper(parms: Parameters) extends Module(parms){
 	
 
 class SimpleVCRouterTester (c: SimpleVCRouterTestWrapper) extends Tester(c) {
-	val routerLatencyInClks = 3
+	val routerLatencyInClks = 6
 
 	var headFlitMap = LinkedHashMap[String, BigInt]()
 	var bodyFlitMap = LinkedHashMap[String, BigInt]()
@@ -87,8 +87,8 @@ class SimpleVCRouterTester (c: SimpleVCRouterTestWrapper) extends Tester(c) {
 	printf("-------------------- Test 1 ----------------------\n")
 	printf("Drive Simple 2-flit packet from port 0 to port 1\n")
 	//drive a flit on port 0
-	headFlitMap("Dest_0") 	= 1
-	headFlitMap("Dest_1") 	= 0
+	headFlitMap("Dest_0") 	= 0
+	headFlitMap("Dest_1") 	= 1
 	headFlitMap("Dest_2") 	= 0
 	headFlitMap("isTail") 	= 0
 	headFlitMap("packetID") = 3
@@ -113,18 +113,20 @@ class SimpleVCRouterTester (c: SimpleVCRouterTestWrapper) extends Tester(c) {
 	step(1)
 	poke(c.io.inChannels(0).flit, zeroFlit)
 	poke(c.io.inChannels(0).flitValid, 0)
-	step(routerLatencyInClks-2)
-	expect(c.io.outChannels(1).flit, myHeadFlit)
+	
+    step(routerLatencyInClks-2)
+
+    expect(c.io.outChannels(1).flit, myHeadFlit)
 	step(1)
 	expect(c.io.outChannels(1).flit, myBodyFlit)
 	printf("------------------ END Test 1 ---------------------\n\n")
-	
+
 	step(1)
 	printf("-------------------- Test 1.5 ----------------------\n")
 	printf("Drive Simple 3-flit packet from Router (0,0) to Router (1,1) (port 0 to port 1)\n")
 	//drive a flit on port 0
-	headFlitMap("Dest_0") 	= 0
-	headFlitMap("Dest_1") 	= 1
+	headFlitMap("Dest_0") 	= 1
+	headFlitMap("Dest_1") 	= 0
 	headFlitMap("Dest_2") 	= 0
 	headFlitMap("isTail") 	= 0
 	headFlitMap("packetID") = 3
@@ -157,11 +159,16 @@ class SimpleVCRouterTester (c: SimpleVCRouterTestWrapper) extends Tester(c) {
 	step(1)
 	poke(c.io.inChannels(0).flit, zeroFlit)
 	poke(c.io.inChannels(0).flitValid, 0)
-	expect(c.io.outChannels(3).flit, myHeadFlit)
+
+    step(routerLatencyInClks-3)
+
+    var n = 2 + c.concentration
+
+    expect(c.io.outChannels(n).flit, myHeadFlit)
 	step(1)
-	expect(c.io.outChannels(3).flit, myBodyFlit)
+	expect(c.io.outChannels(n).flit, myBodyFlit)
 	step(1)
-	expect(c.io.outChannels(3).flit, my2ndBodyFlit)
+	expect(c.io.outChannels(n).flit, my2ndBodyFlit)
 	printf("------------------ END Test 1.5 ---------------------\n\n")
 	step(5)
 	
@@ -171,7 +178,7 @@ class SimpleVCRouterTester (c: SimpleVCRouterTestWrapper) extends Tester(c) {
 	
 	//Create an array of 2-flit packets:
 	var packets = ofDim[Array[BigInt]](c.numInChannels,2)
-	val dest    =  Array(3, 0, 1, 2, 3)
+	val dest    =  Array(3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3)
 	for(i <- 0 until c.numInChannels){
 		headFlitMap("Dest_0") 	= dest(i) & 1 
 		headFlitMap("Dest_1") 	= (dest(i) & 2) >> 1 
